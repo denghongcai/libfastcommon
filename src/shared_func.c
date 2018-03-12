@@ -1085,7 +1085,7 @@ int getFileContentEx(const char *filename, char *buff, \
 		return errno != 0 ? errno : EIO;
 	}
 
-	if ((read_bytes=read(fd, buff, *size)) < 0)
+	if ((read_bytes=read(fd, buff, *size - 1)) < 0)
 	{
 		*size = 0;
 		close(fd);
@@ -1394,7 +1394,9 @@ int load_log_level_ex(const char *conf_filename)
 	int result;
 	IniContext iniContext;
 
-	if ((result=iniLoadFromFileEx(conf_filename, &iniContext, true)) != 0)
+	if ((result=iniLoadFromFileEx(conf_filename, &iniContext,
+                    FAST_INI_ANNOTATION_DISABLE, NULL, 0,
+                    FAST_INI_FLAGS_NONE)) != 0)
 	{
 		logError("file: "__FILE__", line: %d, " \
 			"load conf file \"%s\" fail, ret code: %d", \
@@ -2111,11 +2113,6 @@ char *urldecode(const char *src, const int src_len, char *dest, int *dest_len)
 
 char *urldecode_ex(const char *src, const int src_len, char *dest, int *dest_len)
 {
-#define IS_HEX_CHAR(ch) \
-	((ch >= '0' && ch <= '9') || \
-	 (ch >= 'a' && ch <= 'f') || \
-	 (ch >= 'A' && ch <= 'F'))
-
 #define HEX_VALUE(ch, value) \
 	if (ch >= '0' && ch <= '9') \
 	{ \
@@ -2445,4 +2442,121 @@ bool isTrailingSpacesLine(const char *tail, const char *end)
         ++p;
     }
     return (p == end || *p == '\n');
+}
+
+ssize_t fc_safe_write(int fd, const char *buf, const size_t nbyte)
+{
+    ssize_t n;
+    ssize_t remain;
+    const char *p;
+
+    n = write(fd, buf, nbyte);
+    if (n < 0)
+    {
+        if (errno != EINTR)
+        {
+            return -1;
+        }
+        n = 0;
+    }
+    else if (n == nbyte)
+    {
+        return nbyte;
+    }
+
+    p = buf + n;
+    remain = nbyte - n;
+    while (remain > 0)
+    {
+        n = write(fd, p, remain);
+        if (n < 0)
+        {
+            ssize_t written;
+            if (errno == EINTR)
+            {
+                continue;
+            }
+
+            written = nbyte - remain;
+            return written > 0 ? written : -1;
+        }
+
+        p += n;
+        remain -= n;
+    }
+
+    return nbyte;
+}
+
+ssize_t fc_lock_write(int fd, const char *buf, const size_t nbyte)
+{
+    int lock_result;
+    ssize_t result;
+
+    lock_result = file_write_lock(fd);
+    result = fc_safe_write(fd, buf, nbyte);
+    if (lock_result == 0)
+    {
+        file_unlock(fd);
+    }
+
+    return result;
+}
+
+ssize_t fc_safe_read(int fd, char *buf, const size_t count)
+{
+    ssize_t n;
+    ssize_t remain;
+    char *p;
+
+    n = read(fd, buf, count);
+    if (n < 0)
+    {
+        if (errno != EINTR)
+        {
+            return -1;
+        }
+        n = 0;
+    }
+    else
+    {
+        if (n == 0 || n == count)
+        {
+            return n;
+        }
+    }
+
+    p = buf + n;
+    remain = count - n;
+    while (remain > 0)
+    {
+        n = read(fd, p, remain);
+        if (n < 0)
+        {
+            ssize_t done;
+            if (errno == EINTR)
+            {
+                continue;
+            }
+
+            done = count - remain;
+            return done > 0 ? done : -1;
+        }
+        else if (n == 0)
+        {
+            break;
+        }
+
+        p += n;
+        remain -= n;
+    }
+
+    return count - remain;
+}
+
+key_t fc_ftok(const char *path, const int proj_id)
+{
+    int hash_code;
+    hash_code = simple_hash(path, strlen(path));
+    return (((proj_id & 0xFF) << 24) | (hash_code & 0xFFFFFF));
 }

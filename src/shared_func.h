@@ -213,6 +213,18 @@ char *trim_right(char *pStr);
 */
 char *trim(char *pStr);
 
+/** trim leading and tail spaces ( \t\r\n)
+ *  parameters:
+ *  	pStr: the string to trim
+ *  return: trimed string porinter as pStr
+*/
+static inline char *fc_trim(char *pStr)
+{
+	trim_right(pStr);
+	trim_left(pStr);
+	return pStr;
+}
+
 /** copy string to BufferInfo
  *  parameters:
  *  	pBuff: the dest buffer
@@ -624,9 +636,43 @@ bool isLeadingSpacesLine(const char *content, const char *current);
 */
 bool isTrailingSpacesLine(const char *tail, const char *end);
 
+/** write to file
+ *  parameters:
+ *  	fd: the fd to write
+ *  	buf: the buffer
+ *  	nbyte: the buffer length
+ *  return: written bytes for success, -1 when fail
+*/
+ssize_t fc_safe_write(int fd, const char *buf, const size_t nbyte);
+
+/** lock and write to file
+ *  parameters:
+ *  	fd: the fd to write
+ *  	buf: the buffer
+ *  	nbyte: the buffer length
+ *  return: written bytes for success, -1 when fail
+*/
+ssize_t fc_lock_write(int fd, const char *buf, const size_t nbyte);
+
+/** read from file
+ *  parameters:
+ *  	fd: the fd to read
+ *  	buf: the buffer
+ *  	count: expect read bytes
+ *  return: read bytes for success, -1 when fail
+*/
+ssize_t fc_safe_read(int fd, char *buf, const size_t count);
+
+/** ftok with hash code
+ *  parameters:
+ *  	path: the file path
+ *  	proj_id: the project id
+ *  return: read bytes for success, -1 when fail
+*/
+key_t fc_ftok(const char *path, const int proj_id);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

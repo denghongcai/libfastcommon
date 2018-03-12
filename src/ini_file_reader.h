@@ -19,6 +19,14 @@
 #define FAST_INI_ITEM_NAME_LEN		64
 #define FAST_INI_ITEM_VALUE_LEN		256
 
+#define FAST_INI_ANNOTATION_WITHOUT_BUILTIN 0
+#define FAST_INI_ANNOTATION_DISABLE         1
+#define FAST_INI_ANNOTATION_WITH_BUILTIN    2
+#define FAST_INI_ANNOTATION_NONE  FAST_INI_ANNOTATION_DISABLE
+
+#define FAST_INI_FLAGS_NONE            0
+#define FAST_INI_FLAGS_SHELL_EXECUTE   1
+
 typedef struct {
     char *func_name;
     int (*func_init) ();
@@ -51,14 +59,15 @@ typedef struct
 	HashArray sections;  //key is session name, and value is IniSection
 	IniSection *current_section; //for load from ini file
 	char config_path[MAX_PATH_SIZE];  //save the config filepath
-    bool ignore_annotation;
+    char annotation_type;
+    char flags;
 } IniContext;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define INI_STRING_IS_TRUE(pValue)  \
+#define FAST_INI_STRING_IS_TRUE(pValue)  \
     (strcasecmp(pValue, "true") == 0 || \
      strcasecmp(pValue, "yes") == 0 ||  \
      strcasecmp(pValue, "on") == 0 ||   \
@@ -79,11 +88,15 @@ int iniLoadFromFile(const char *szFilename, IniContext *pContext);
  *  parameters:
  *           szFilename: the filename, can be an URL
  *           pContext: the ini context
- *           ignore_annotation: whether ignore annotation
+ *           annotation_type: the annotation type
+ *           annotations: the annotations, can be NULL
+ *           count: the annotation count
+ *           flags: the flags
  *  return: error no, 0 for success, != 0 fail
 */
 int iniLoadFromFileEx(const char *szFilename, IniContext *pContext,
-    bool ignore_annotation);
+    const char annotation_type, AnnotationMap *annotations, const int count,
+    const char flags);
 
 /** load ini items from string buffer
  *  parameters:
@@ -92,6 +105,20 @@ int iniLoadFromFileEx(const char *szFilename, IniContext *pContext,
  *  return: error no, 0 for success, != 0 fail
 */
 int iniLoadFromBuffer(char *content, IniContext *pContext);
+
+/** load ini items from string buffer
+ *  parameters:
+ *           content: the string buffer to parse
+ *           pContext: the ini context
+ *           annotation_type: the annotation type
+ *           annotations: the annotations, can be NULL
+ *           count: the annotation count
+ *           flags: the flags
+ *  return: error no, 0 for success, != 0 fail
+*/
+int iniLoadFromBufferEx(char *content, IniContext *pContext,
+    const char annotation_type, AnnotationMap *annotations, const int count,
+    const char flags);
 
 /** free ini context
  *  parameters:
